@@ -83,9 +83,8 @@ def plot_result(result, plot_phase=True, plot_ellipse=True):
     phi_arr = np.linspace(0, 1, 100)
     pol_phis = (pol_HJDs-T0)/P - ((pol_HJDs-T0)/P).astype(int)+1
     U_fit, Q_fit = pol_fit(phi_arr, U_0, Q_0, BigOmega, tau_star, inc)
-    inc1 = 54.87*np.pi/180
-    # inc1 = 42.99*np.pi/180
-    U_fit1, Q_fit1 = pol_fit(phi_arr, U_0, Q_0, BigOmega, tau_star, inc1)
+    # inc1 = 54.87*np.pi/180
+    # U_fit1, Q_fit1 = pol_fit(phi_arr, U_0, Q_0, BigOmega, tau_star, inc1)
 
     if plot_phase:
         plt.errorbar(pol_phis, pol_Us, yerr=pol_sig, fmt='.', color='darkgreen', alpha=0.4, label='U')
@@ -120,7 +119,7 @@ def main(plot_best=False, inc_grid=False, step=5):
         # Fit for specified parameters and plot best fit
         result = minimizer(chisqr)
         plot_result(result)
-    elif inc_grid:
+    if inc_grid:
         # Create grid of inclinations and plot red chi^2
         red_chi2 = []
         phis = []
@@ -128,7 +127,7 @@ def main(plot_best=False, inc_grid=False, step=5):
             result = minimizer(chisqr, set_inc=inc)
             red_chi2.append(result.redchi)
             phis.append(inc)        
-        plot_chi2(phis, red_chi2, step)
+        plot_chi2(phis, red_chi2)
 
 if __name__ == '__main__':
     main()

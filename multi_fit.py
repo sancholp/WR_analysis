@@ -293,7 +293,7 @@ def main(plot_best=False, inc_grid=False, step=5):
             result, _ = minimizer(chisqr, set_inc=inc)
             red_chi2.append(result.redchi)
             phis.append(inc)
-        plot_chi2(phis, red_chi2, step)
+        plot_chi2(phis, red_chi2)
 
 if __name__ == '__main__':
     main()

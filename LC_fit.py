@@ -55,7 +55,6 @@ def LC_func(phi, offset, inc, dotM, dotM2, asini, fWR2O):
     """
     phi2pi = 2*np.pi*phi+np.pi # phi=0 WR in back
     a = asini / np.sin(inc)
-    # check_if_in_range(R/a, R2/a, 0, 1)
     #* (9)
     k  = alpha*sigt*dotM / (4*np.pi*mp*v_inf*a)
     k2 = alpha2*sigt*dotM2 / (4*np.pi*mp*v_inf2*a)
@@ -70,6 +69,7 @@ def LC_func(phi, offset, inc, dotM, dotM2, asini, fWR2O):
     #*(15)
     # print(R > a*np.sqrt(1-eps**2), inc*180/np.pi)
     b  = R/a / np.sqrt(1-eps**2)  #! Becomes greater than 1
+    # check_if_in_range(R, R, 0, a)
     for idx, item in enumerate(b): #TODO: Find out why it's unstable at inc > 60
         if item > 1: # Capping it so it doesn't give NaNs
             b[idx] = 0.99
@@ -127,11 +127,10 @@ def minimizer(mini_func, MiniMethod='differential_evolution', set_inc=None):
     params.add('ecc', value=0, min=0, max=1e-4, vary=False)
     params.add('dotM', value=-5.895, min=-8.3, max=-4, vary=True)
     params.add('dotM2', value=-4.695, min=-5.5, max=-3, vary=True)
-    params.add('inc', value=54.8, min=30, max=60, vary=True)
     params.add('fWR2O', value=4, min=0.2, max=5, vary=False)
     params.add('offset', value=12.524, min=12.2, max=12.8, vary=True) #* Delta mag in (13)
     if set_inc is None:
-        params.add('inc', value=54.87, min=20, max=55, vary=True)
+        params.add('inc', value=54.87, min=20, max=80, vary=True)
     else:
         params.add('inc', value=set_inc, min=0, max=90, vary=False)
 
@@ -199,12 +198,11 @@ def plot_result(result, ci=None):
     plt.subplots_adjust(hspace=0)
     plt.show()
 
-def plot_chi2(phis, red_chi2, *args):
+def plot_chi2(phis, red_chi2):
     """
     Plots the reduced chi^2 of the fits as a function of inclination.
     """
-    step=args[0]
-    # np.savetxt('LC_redchi2.txt', red_chi2)
+    # np.savetxt('redchi2.txt', red_chi2)
     plt.scatter(phis, red_chi2)
     plt.title('Reduced $\chi^2$ of fit at various inclinations')
     plt.xlabel('Inclination')
@@ -232,7 +230,7 @@ def main(plot_best=False, inc_grid=False, step=5):
             red_chi2.append(result.redchi)
             phis.append(inc)
             # plot_result(result)
-        plot_chi2(phis, red_chi2, step)
+        plot_chi2(phis, red_chi2)
 
 if __name__ == '__main__':
     main()

@@ -1,21 +1,18 @@
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import lmfit
-import os
+from LC_fit import plot_chi2
 
 #********************* Define initial guesses for system ***********************
-Pini = 1.90753233  # Define initial orbit guess (in days) (Current is for BAT99-32)
+Pini = 1.90753164   # Define initial orbit guess
 T0ini = 2459107.55
 
 #************************** Load in Polarimetry data ***************************
-pol_path = os.path.join('Data', 'polarimetry_data.csv')
-pols = pd.read_csv(pol_path)
-
-pol_HJDs = pols['MJD'] + 2440000 # MJD to HJD
-pol_Qs   = pols['Q']
-pol_Us   = pols['U']
-pol_sig  = pols['sig(P)']
+pols = np.genfromtxt('BAT99-32_polarimetry_data.txt')
+pol_HJDs = pols[:,0] + 2440000
+pol_Qs   = pols[:,1]
+pol_Us   = pols[:,2]
+pol_sig  = pols[:,3]
 
 #********************************** Functions **********************************
 def pol_fit(lampol, U_0, Q_0, BigOmega, tau_star, inc):
@@ -54,12 +51,12 @@ def minimizer(mini_func, MiniMethod='differential_evolution', set_inc=None):
     params = lmfit.Parameters()
     params.add('BigOmega', value=220,  min=0, max=360, vary=True)
     params.add('tau_star', value=0.29,  min=0, max=1, vary=True)
-    params.add('Q_0', value=0.65, min=0.2, max=1, vary=True)
-    params.add('U_0', value=0.11, min=0, max=1, vary=True)
+    params.add('Q_0', value=0.64, min=0.5, max=0.75, vary=True)
+    params.add('U_0', value=0.11, min=-0.1, max=0.2, vary=True)
     params.add('P', value=Pini, min=Pini-0.7*Pini, max=Pini+0.7*Pini, vary=False)
     params.add('T0', value=T0ini, min=T0ini-0.5*Pini, max=T0ini+0.5*Pini, vary=False) # in HJD
     if set_inc is None:
-        params.add('inc', value=58,  min=20, max=70, vary=True)
+        params.add('inc', value=54.87,  min=20, max=70, vary=True)
     else:
         params.add('inc', value=set_inc,  min=0, max=90, vary=False)
 
@@ -84,7 +81,7 @@ def plot_result(result, plot_phase=True, plot_ellipse=True):
     P        = result.params['P'].value
 
     phi_arr = np.linspace(0, 1, 100)
-    pol_phis = (pol_HJDs-T0)/P - ((pol_HJDs-T0)/P).astype(int)
+    pol_phis = (pol_HJDs-T0)/P - ((pol_HJDs-T0)/P).astype(int)+1
     U_fit, Q_fit = pol_fit(phi_arr, U_0, Q_0, BigOmega, tau_star, inc)
     inc1 = 54.87*np.pi/180
     # inc1 = 42.99*np.pi/180
@@ -113,19 +110,7 @@ def plot_result(result, plot_phase=True, plot_ellipse=True):
         plt.tight_layout()
         plt.show()
 
-def plot_chi2(red_chi2, *args):
-    """
-    Plots the reduced chi^2 of the fits as a function of inclination.
-    """
-    step=args[0]
-    plt.scatter(np.arange(0,90.001, step), red_chi2)
-    plt.title('Reduced $\chi^2$ of fit at various inclinations')
-    plt.xlabel('Inclination')
-    plt.ylabel('Reduced $\chi^2$')
-    plt.tight_layout()
-    plt.show()
-
-def main(plot_best=True, inc_grid=False, step=10):
+def main(plot_best=False, inc_grid=False, step=5):
     """
     When plot_best, fits for the parameters specified in minimizer. When inc_grid,
     greates a grid of inclinations at a resolution of step and plots reduced chi^2
@@ -138,10 +123,12 @@ def main(plot_best=True, inc_grid=False, step=10):
     elif inc_grid:
         # Create grid of inclinations and plot red chi^2
         red_chi2 = []
-        for inc in np.arange(0,90.001,step):
+        phis = []
+        for inc in np.arange(5,90,step):
             result = minimizer(chisqr, set_inc=inc)
             red_chi2.append(result.redchi)
-        plot_chi2(red_chi2, step)
+            phis.append(inc)        
+        plot_chi2(phis, red_chi2, step)
 
 if __name__ == '__main__':
     main()

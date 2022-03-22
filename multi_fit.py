@@ -5,7 +5,7 @@ import lmfit
 import matplotlib.pyplot as plt
 from matplotlib.legend_handler import HandlerTuple
 from astropy.io import ascii
-from LC_fit import LC_func
+from LC_fit import LC_func, plot_chi2
 from polarization_fit import pol_fit
 
 
@@ -21,32 +21,33 @@ Msun = 2E30 # kg
 #! Numberless vars are O-star
 alpha  = 0.5 # free electrons per baryon mass
 alpha2 = 0.5
-v_inf  = 1200*1000 # m/s
-v_inf2 = 1600*1000
-R  = 6*Rsun
-R2 = 1*Rsun
+v_inf  = 2600*1000 # m/s Following values are from PoWR model fitting
+v_inf2 = 1200*1000 # Shenar+2019 use 2000
+R  = 9*Rsun
+R2 = 4*Rsun
 # Orbit-dependent parameters
-Pini  = 1.90753233 # Define initial orbit guess (in days) (Current is for BAT99-32)
+Pini  = 1.90753233
 T0ini = 2459107.55
 
 #************************** Load in Light Curve data ***************************
-LC_path = os.path.join('Data', 'light_curve_data.csv')
+LC_path = os.path.join('NormBAT99-32', 'light_curve.csv')
 light_curve = pd.read_csv(LC_path, header=0, usecols=[0,3,4])
 LC_HJDs = light_curve['hjd'].values
 LC_mags = np.array(light_curve['mag'].values)
 LC_errs = np.array(light_curve['mag err'].values)
 
 #************************** Load in Polarimetry data ***************************
-pol_path = os.path.join('Data', 'polarimetry_data.csv')
-pols = pd.read_csv(pol_path)
-
-pol_HJDs = pols['MJD'] + 2440000 # MJD to HJD
-pol_Qs   = pols['Q']
-pol_Us   = pols['U']
-pol_sig  = pols['sig(P)']
+pols = np.genfromtxt('BAT99-32_polarimetry_data.txt')
+pol_HJDs = pols[:,0] + 2440000
+pol_Qs   = pols[:,1]
+pol_Us   = pols[:,2]
+pol_sig  = pols[:,3]
 
 #************************ Load in Radial Velocity data *************************
-RVs_path = os.path.join('Data', 'RVs_CCF.txt')
+line_name = 'NV-4604'
+# line_name = 'NV-4951'
+
+RVs_path = os.path.join('CCF_results', 'BAT99-32_rel', line_name, 'RVs_CCF.txt')
 velos = ascii.read(RVs_path)
 
 RV_HJDs   = np.array(velos['MJD']+2400000.5)
@@ -83,7 +84,6 @@ def v1only(nu, Gamma, K1, Omega, ecc):
     return v1
 
 def chisqr(params):
-    """Chi^2 function to reduce using LMFit."""
     P      = params['P'].value
     T0     = params['T0'].value
     Gamma  = params['Gamma'].value    
@@ -105,8 +105,9 @@ def chisqr(params):
     asini    = 0.0198 * (1-ecc**2)**(1./2.) * (K1+K2) * P *Rsun
     phasesLC = (LC_HJDs-T0)/P - ((LC_HJDs-T0)/P).astype(int) + 1
     lamLC = phasesLC # lambda = nu + omega + 90 (shenar+2021 Tarantula)
-    phases_pol = (pol_HJDs-T0)/P - ((pol_HJDs-T0)/P).astype(int)
+    phases_pol = (pol_HJDs-T0)/P - ((pol_HJDs-T0)/P).astype(int)+1
     lampol = phases_pol # lambda = nu + omega + 90 (shenar+2021 Tarantula)
+
 
     lightmod = LC_func(lamLC, offset, inc, dotM, dotM2, asini, fWR2O)
     v1       = v1only(nus(P, T0, ecc), Gamma, K1, Omega, ecc)
@@ -128,17 +129,17 @@ def minimizer(mini_func, MiniMethod='differential_evolution', set_inc=None):
     params.add('Omega', value= 90, min=0, max=360, vary=False)
     params.add('ecc', value=0, min=0, max=1e-4, vary=False)
 
-    params.add('dotM', value=-5.895, min=-6.3, max=-4.5, vary=False)
-    params.add('dotM2', value=-4.695, min=-5.5, max=-3, vary=False)
+    params.add('dotM', value=-5.895, min=-6.3, max=-4.5, vary=True)
+    params.add('dotM2', value=-4.695, min=-5.5, max=-3, vary=True)
     params.add('fWR2O', value=1.5, min=0.2, max=2, vary=False)
     params.add('offset', value=12.524, min=12.4, max=12.8, vary=True) # Delta mag in (13)
 
-    params.add('BigOmega', value=220, min=0, max=360, vary=True)
-    params.add('tau_star', value=0.29, min=0, max=1, vary=True)
-    params.add('Q_0', value=0.65, min=0.5, max=0.75, vary=True)
-    params.add('U_0', value=0.11, min=-0.1, max=0.2, vary=True)
+    params.add('BigOmega', value=218.614, min=0, max=360, vary=False)
+    params.add('tau_star', value=0.2429, min=0, max=1, vary=False)
+    params.add('Q_0', value=0.592, min=0.5, max=0.75, vary=False)
+    params.add('U_0', value=0.061, min=-0.1, max=0.2, vary=False)
     if set_inc is None:
-        params.add('inc', value=54, min=30, max=70, vary=True)
+        params.add('inc', value=54.87, min=20, max=70, vary=True)
     else:
         params.add('inc', value=set_inc, min=0, max=90, vary=False)
 
@@ -174,14 +175,14 @@ def plot_result(result, ci, plot_phase=True, interv_flag=True, plot_ellipse=True
     U_0      = result.params['U_0'].value
     asini = 0.0198 * (1-ecc**2)**(1./2.) * (K1+K2) * P  *Rsun
     dotM  = 10**(dotM)* Msun / (365*24*3600.)
-    dotM2 = 10**(dotM2)* Msun / (365*24*3600.)
+    dotM2 = 10**(dotM2)* Msun /  (365*24*3600.)
 
     # Create phase array for plotting simulated lines
     phi_arr = np.linspace(0, 1, 100)
     # Calculating phases for data points
     RV_phis  = (RV_HJDs-T0)/P - ((RV_HJDs-T0)/P).astype(int)
     LC_phis  = (LC_HJDs-T0)/P - ((LC_HJDs-T0)/P).astype(int) + 1
-    pol_phis = (pol_HJDs-T0)/P - ((pol_HJDs-T0)/P).astype(int)
+    pol_phis = (pol_HJDs-T0)/P - ((pol_HJDs-T0)/P).astype(int) + 1
 
     # Fit result for LC
     LC_sim  = LC_func(phi_arr, offset, inc, dotM, dotM2, asini, fWR2O)
@@ -274,19 +275,7 @@ def plot_result(result, ci, plot_phase=True, interv_flag=True, plot_ellipse=True
         plt.tight_layout()
         plt.show()
 
-def plot_chi2(red_chi2, *args):
-    """
-    Plots the reduced chi^2 of the fits as a function of inclination.
-    """
-    step=args[0]
-    plt.scatter(np.arange(0,90.001, step), red_chi2)
-    plt.title('Reduced $\chi^2$ of fit at various inclinations')
-    plt.xlabel('Inclination')
-    plt.ylabel('Reduced $\chi^2$')
-    plt.tight_layout()
-    plt.show()
-
-def main(plot_best=True, inc_grid=False, step=5):
+def main(plot_best=False, inc_grid=False, step=5):
     """
     When plot_best, fits for the parameters specified in minimizer. When inc_grid,
     greates a grid of inclinations at a resolution of step and plots reduced chi^2
@@ -299,10 +288,12 @@ def main(plot_best=True, inc_grid=False, step=5):
     elif inc_grid:
         # Create grid of inclinations and plot red chi^2
         red_chi2 = []
-        for inc in np.arange(0,90.001,step):
+        phis = []
+        for inc in np.arange(5,90,step):
             result, _ = minimizer(chisqr, set_inc=inc)
             red_chi2.append(result.redchi)
-        plot_chi2(red_chi2, step)
+            phis.append(inc)
+        plot_chi2(phis, red_chi2, step)
 
 if __name__ == '__main__':
     main()
